@@ -44,27 +44,27 @@ Loads dictionary to Unalias object.
         (OPTIONAL) Path to dictionary file in tabular (TSV) format. 
         First column must be official symbol. All subsequent columns must be synonyms. If no dictionary is given, the HGNC dictionary will be used.
 
+        (OPTIONAL) Skip first line toggle. 1 => skip, 0 => do not skip.
+
+        (OPTIONAL) Separator for dictionary. Default "\t".
 =cut
 sub load {
     my $self      = shift;
-    my $dict_file = "";
+    my $dict_file = shift // dist_file("CGL", "HGNC_gene_dictionary.txt");
+    my $skip      = shift // 1; 
+    my $separator = shift // "\t";
     $self->{'dictionary'} = ();
-    if (scalar(@_)) {
-        # Use the provided file as dictionary
-        $dict_file = shift;
-    } else {
-        # Use dictionary saved on install directory
-        $dict_file = dist_file("CGL", "HGNC_gene_dictionary.txt");
-    }
 
     open(my $fh, "<", $dict_file)
         or die "Can't open dictionary file: $dict_file - $!\n";
-    <$fh>; # skip first line
+    
+    <$fh> if $skip; # skip first (header) line of dictionary
     while (my $line = <$fh>) {
         chomp($line);
-        my ($off, @rest) = split /\t/, $line;
+        my ($off, @rest) = split /$separator/, $line;
+        $off = $self->clean_symbol($off);
         foreach my $alias (@rest) {
-            $self->{'dictionary'}->{ $self->clean_symbol($alias) } = $self->clean_symbol($off);
+            $self->{'dictionary'}->{ $self->clean_symbol($alias) } = $off;
         }
     }
     return;
@@ -80,7 +80,7 @@ Removes strange symbols and makes gene symbols upper case.
 
 =cut
 sub clean_symbol {
-    my $self = shift;
+    my $self   = shift;
     my $string = shift;
     $string = uc($string);
     $string =~ s/[^\w\t\s\d]//gi;
